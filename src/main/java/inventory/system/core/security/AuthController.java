@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import inventory.system.core.User.AppUser;
-import inventory.system.core.User.AppUserRepository;
 import inventory.system.core.security.dto.ErrorResponse;
 import inventory.system.core.security.dto.LoginRequest;
 import inventory.system.core.security.dto.LoginSuccessResponse;
 import inventory.system.core.security.dto.RegisterRequest;
 import inventory.system.core.security.dto.RegisterSuccessResponse;
+import inventory.system.core.user.AppUser;
+import inventory.system.core.user.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 
 @RestController

@@ -1,4 +1,4 @@
-package inventory.system.core.User;
+package inventory.system.core.user;
 
 import java.time.LocalDateTime;
 
