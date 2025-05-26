@@ -17,7 +17,7 @@ import inventory.system.core.User.AppUser;
 import inventory.system.core.User.AppUserRepository;
 import inventory.system.core.security.dto.ErrorResponse;
 import inventory.system.core.security.dto.LoginRequest;
-import inventory.system.core.security.dto.LoginResponse;
+import inventory.system.core.security.dto.LoginSuccessResponse;
 import inventory.system.core.security.dto.RegisterRequest;
 import inventory.system.core.security.dto.RegisterSuccessResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,39 +34,7 @@ public class AuthController {
     private final AppUserRepository appUserRepo;
     private final PasswordEncoder passwordEncoder;
 
-    /*---------------LOGIN---*/
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        try {
-            // 1. Authenticate the user using their username and password
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                request.getEmail(),
-                request.getPassword()
-            );
-            authManager.authenticate(authentication);
-            // 2. Load the full user details from the database
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-            // 3. Generate a JWT token using the user's username and authorities (roles)
-            String token = jwtUtil.generateToken(
-                userDetails.getUsername(),
-                userDetails.getAuthorities()
-            );
-            // 4. Return the token in a response object
-            return ResponseEntity.ok(new LoginResponse(token));
-        } catch (AuthenticationException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse("Invalid credentials"));
-        }
-    }
-
-    /*---------------LOGOUT--*/
-    @PostMapping("/logout")
-    public String logout() {
-        // JWT-based logout = handled on frontend: just delete token from local storage/cookies
-        return "Logged out successfully (just delete the token client-side).";
-    }
-
-    /*--------------Register-*/
+      /*--------------Register-*/
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
@@ -90,6 +58,40 @@ public class AuthController {
         }
     }
 
+
+    /*---------------LOGIN---*/
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            // 1. Authenticate the user using their username and password
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                request.getEmail(),
+                request.getPassword()
+            );
+            authManager.authenticate(authentication);
+            // 2. Load the full user details from the database
+            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+            // 3. Generate a JWT token using the user's username and authorities (roles)
+            String token = jwtUtil.generateToken(
+                userDetails.getUsername(),
+                userDetails.getAuthorities()
+            );
+            // 4. Return the token in a response object
+            return ResponseEntity.ok(new LoginSuccessResponse(token));
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("Invalid credentials"));
+        }
+    }
+
+    /*---------------LOGOUT--*/
+    @PostMapping("/logout")
+    public String logout() {
+        // JWT-based logout = handled on frontend: just delete token from local storage/cookies
+        return "Logged out successfully (just delete the token client-side).";
+    }
+
+  
 
 
 }
