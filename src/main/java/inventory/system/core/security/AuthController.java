@@ -65,6 +65,7 @@ public class AuthController {
         AppUser appUser = AppUser.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .fullName(request.getFullname())
                 .role(AppUser.Role.USER)
                 .build();
 
