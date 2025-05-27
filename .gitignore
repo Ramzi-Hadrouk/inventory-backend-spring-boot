@@ -5,6 +5,7 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+ToDo.text
 ### STS ###
 .apt_generated
 .classpath
