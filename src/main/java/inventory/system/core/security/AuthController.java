@@ -26,6 +26,7 @@ import inventory.system.core.security.dto.UserInfoResponse; // New DTO import
 
 import inventory.system.core.user.AppUser;
 import inventory.system.core.user.AppUserRepository;
+import inventory.system.core.user.Role;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -38,141 +39,149 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AuthController {
 
-    private final AuthenticationManager authManager;
-    private final UserDetailsService userDetailsService; // This is your CustomUserDetailsService
-    private final JwtUtil jwtUtil;
-    private final AppUserRepository appUserRepo;
-    private final PasswordEncoder passwordEncoder;
+        private final AuthenticationManager authManager;
+        private final UserDetailsService userDetailsService; // This is your CustomUserDetailsService
+        private final JwtUtil jwtUtil;
+        private final AppUserRepository appUserRepo;
+        private final PasswordEncoder passwordEncoder;
 
-    /*--------------Register--------------------------------------------------------------------*/
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        try {
-            if (appUserRepo.findByEmail(request.getEmail()).isPresent()) {
-                return ResponseEntity.badRequest()
-                        .body(new ErrorResponse(SecurityConstants.EMAIL_ALREADY_EXISTS_MSG));
-            }
+        /*--------------Register--------------------------------------------------------------------*/
+        @PostMapping("/register")
+        public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+                try {
+                        if (appUserRepo.findByEmail(request.getEmail()).isPresent()) {
+                                return ResponseEntity.badRequest()
+                                                .body(new ErrorResponse(SecurityConstants.EMAIL_ALREADY_EXISTS_MSG));
+                        }
 
-            // Create and save the user
-            AppUser appUser = AppUser.builder()
-                    .email(request.getEmail())
-                    .password(passwordEncoder.encode(request.getPassword()))
-                    .fullName(request.getFullname())
-                    .role(AppUser.Role.USER)
-                    .build();
-            appUserRepo.save(appUser);
+                        // Create and save the user
+                        AppUser appUser = new AppUser(
+                                        null, // ID will be generated
+                                        request.getFullname(), // Full name from request
+                                        request.getEmail(), // Email from request
+                                        passwordEncoder.encode(request.getPassword()), // Password will be set later
+                                                                                       // after encoding
+                                        List.of(Role.USER), // Default role for new users
+                                        null // Created at will be set by JPA prePersist
+                        );
 
-            // Generate token for the newly registered user
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-            String token = jwtUtil.generateToken(
-                    userDetails.getUsername(),
-                    userDetails.getAuthorities());
+                        appUserRepo.save(appUser);
 
-            // Return unified response
-            List<String> roles = List.of(appUser.getRole().name()); // Single role as list
-            return ResponseEntity.ok(new SuccessAuthResponse(
-                    appUser.getEmail(),
-                    appUser.getFullName(),
-                    roles,
-                    token));
+                        // Generate token for the newly registered user
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+                        String token = jwtUtil.generateToken(
+                                        userDetails.getUsername(),
+                                        userDetails.getAuthorities());
 
-        } catch (Exception e) {
-            log.error("Registration failed for email {}: {}", request.getEmail(), e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse(SecurityConstants.REGISTRATION_FAILED_MSG));
-        }
-    }
+                        // Return unified response
+                        List<String> roles = appUser.getRoles().stream()
+                                        .map(Role::name)
+                                        .collect(Collectors.toList());
+                        return ResponseEntity.ok(new SuccessAuthResponse(
+                                        appUser.getEmail(),
+                                        appUser.getFullName(),
+                                        roles,
+                                        token));
 
-    /*---------------LOGIN----------------------------------------------------------------------*/
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        try {
-            // Authenticate user
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    request.getEmail(),
-                    request.getPassword());
-            authManager.authenticate(authentication);
-
-            // Generate token
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-            String token = jwtUtil.generateToken(
-                    userDetails.getUsername(),
-                    userDetails.getAuthorities());
-
-            // Fetch additional user details (e.g., fullName)
-            AppUser appUser = appUserRepo.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            // Return unified response
-            // Return unified response
-            List<String> roles = List.of(appUser.getRole().name()); // Single role as list
-            return ResponseEntity.ok(new SuccessAuthResponse(
-                    appUser.getEmail(),
-                    appUser.getFullName(),
-                    roles,
-                    token));
-
-        } catch (AuthenticationException e) {
-            log.warn("Login failed for email {}: {}", request.getEmail(), e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse(SecurityConstants.INVALID_CREDENTIALS_MSG));
-        }
-    }
-
-    /*---------------LOGOUT---------------------------------------------------------------------*/
-    @PostMapping("/logout")
-    public ResponseEntity<ErrorResponse> logout() {
-        return ResponseEntity.ok(new ErrorResponse(SecurityConstants.LOGOUT_SUCCESS_MSG));
-    }
-
-    /*---------------GET USER INFO--------------------------------------------------------------*/
-    /**
-     * Endpoint to retrieve information about the currently authenticated user.
-     * The user must provide a valid JWT token in the Authorization header.
-     * 
-     * @return UserInfoResponse containing email, fullName, and roles, or an error
-     *         if not authenticated.
-     */
-    @GetMapping("/me") // Or any other path you prefer, e.g., "/userinfo"
-    public ResponseEntity<?> getUserInfo() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("User not authenticated."));
+                } catch (Exception e) {
+                        log.error("Registration failed for email {}: {}", request.getEmail(), e.getMessage(), e);
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new ErrorResponse(SecurityConstants.REGISTRATION_FAILED_MSG));
+                }
         }
 
-        Object principal = authentication.getPrincipal();
-        String email;
+        /*---------------LOGIN----------------------------------------------------------------------*/
+        @PostMapping("/login")
+        public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+                try {
+                        // Authenticate user
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                        request.getEmail(),
+                                        request.getPassword());
+                        authManager.authenticate(authentication);
 
-        if (principal instanceof UserDetails) {
-            email = ((UserDetails) principal).getUsername();
-        } else {
-            email = principal.toString(); // Fallback, though with JWT UserDetails is expected
+                        // Generate token
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+                        String token = jwtUtil.generateToken(
+                                        userDetails.getUsername(),
+                                        userDetails.getAuthorities());
+
+                        // Fetch additional user details (e.g., fullName)
+                        AppUser appUser = appUserRepo.findByEmail(request.getEmail())
+                                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                        // Return unified response
+                        // Return unified response
+                        List<String> roles = appUser.getRoles().stream()
+                                        .map(Role::name)
+                                        .collect(Collectors.toList());
+                        return ResponseEntity.ok(new SuccessAuthResponse(
+                                        appUser.getEmail(),
+                                        appUser.getFullName(),
+                                        roles,
+                                        token));
+
+                } catch (AuthenticationException e) {
+                        log.warn("Login failed for email {}: {}", request.getEmail(), e.getMessage());
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(new ErrorResponse(SecurityConstants.INVALID_CREDENTIALS_MSG));
+                }
         }
 
-        // Fetch AppUser to get the full name, as UserDetails might not have it directly
-        // depending on its implementation. Your CustomUserDetailsService loads AppUser.
-        AppUser appUser = appUserRepo.findByEmail(email)
-                .orElse(null);
-
-        if (appUser == null) {
-            // This case should ideally not happen if the token was valid and user exists
-            log.error("Authenticated user {} not found in repository.", email);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Could not retrieve user details."));
+        /*---------------LOGOUT---------------------------------------------------------------------*/
+        @PostMapping("/logout")
+        public ResponseEntity<ErrorResponse> logout() {
+                return ResponseEntity.ok(new ErrorResponse(SecurityConstants.LOGOUT_SUCCESS_MSG));
         }
 
-        List<String> roles = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toList());
+        /*---------------GET USER INFO--------------------------------------------------------------*/
+        /**
+         * Endpoint to retrieve information about the currently authenticated user.
+         * The user must provide a valid JWT token in the Authorization header.
+         * 
+         * @return UserInfoResponse containing email, fullName, and roles, or an error
+         *         if not authenticated.
+         */
+        @GetMapping("/me") // Or any other path you prefer, e.g., "/userinfo"
+        public ResponseEntity<?> getUserInfo() {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        UserInfoResponse userInfo = new UserInfoResponse(
-                appUser.getEmail(),
-                appUser.getFullName(), // Assuming AppUser has getFullName()
-                roles);
+                if (authentication == null || !authentication.isAuthenticated()
+                                || "anonymousUser".equals(authentication.getPrincipal())) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(new ErrorResponse("User not authenticated."));
+                }
 
-        return ResponseEntity.ok(userInfo);
-    }
+                Object principal = authentication.getPrincipal();
+                String email;
+
+                if (principal instanceof UserDetails) {
+                        email = ((UserDetails) principal).getUsername();
+                } else {
+                        email = principal.toString(); // Fallback, though with JWT UserDetails is expected
+                }
+
+                // Fetch AppUser to get the full name, as UserDetails might not have it directly
+                // depending on its implementation. Your CustomUserDetailsService loads AppUser.
+                AppUser appUser = appUserRepo.findByEmail(email)
+                                .orElse(null);
+
+                if (appUser == null) {
+                        // This case should ideally not happen if the token was valid and user exists
+                        log.error("Authenticated user {} not found in repository.", email);
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new ErrorResponse("Could not retrieve user details."));
+                }
+
+                List<String> roles = authentication.getAuthorities().stream()
+                                .map(GrantedAuthority::getAuthority)
+                                .collect(Collectors.toList());
+
+                UserInfoResponse userInfo = new UserInfoResponse(
+                                appUser.getEmail(),
+                                appUser.getFullName(), // Assuming AppUser has getFullName()
+                                roles);
+
+                return ResponseEntity.ok(userInfo);
+        }
 }

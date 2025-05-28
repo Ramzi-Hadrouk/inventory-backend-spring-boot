@@ -1,10 +1,11 @@
 package inventory.system.core.user;
 
 import java.time.LocalDateTime;
-
-
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,7 +15,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,7 +24,6 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Table(name = "users")
 public class AppUser {
 
@@ -40,8 +39,9 @@ public class AppUser {
 
     private String password;
 
+    @ElementCollection
     @Enumerated(EnumType.STRING)
-    private Role role;
+    private List<Role> roles = new ArrayList<>();
 
     private LocalDateTime createdAt;
 
@@ -50,7 +50,5 @@ public class AppUser {
         this.createdAt = LocalDateTime.now();
     }
 
-    public enum Role {
-        ADMIN, USER
-    }
+
 }
