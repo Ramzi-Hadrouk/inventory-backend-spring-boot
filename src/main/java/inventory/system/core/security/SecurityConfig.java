@@ -3,7 +3,6 @@ package inventory.system.core.security;
 import java.util.Arrays;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,11 +35,6 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService; // This is your CustomUserDetailsService
 
-    // PasswordEncoder is typically defined in another @Configuration class (like your SecurityBeanConfig)
-    // and @Autowired here.
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     @Value("${cors.allowed-origins}")
     private String[] allowedOrigins;
 
@@ -50,12 +44,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .exceptionHandling(handler -> handler
-                .authenticationEntryPoint((request, response, exception) -> {
+                .authenticationEntryPoint((_, response, exception) -> {
                     log.error("Authentication error: ", exception);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.getWriter().write("{\"message\":\"" + exception.getMessage() + "\"}");
                 })
-                .accessDeniedHandler((request, response, exception) -> {
+                .accessDeniedHandler((_, response, exception) -> {
                     log.error("Access denied error: ", exception);
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.getWriter().write("{\"message\":\"Access denied: " + exception.getMessage() + "\"}");
@@ -68,16 +62,15 @@ public class SecurityConfig {
                 .requestMatchers("/v1/auth/me").permitAll()
                 .anyRequest().authenticated()
             )
-            .authenticationProvider(authenticationProvider())
+            .authenticationProvider(authenticationProvider(null))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class); // Add JWT filter
 
         return http.build();
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+    public AuthenticationProvider authenticationProvider(PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService); // Pass UserDetailsService in constructor
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }
@@ -106,5 +99,10 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration); // Apply this configuration to all paths
         return source;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
     }
 }

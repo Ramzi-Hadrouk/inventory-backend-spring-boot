@@ -4,8 +4,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hibernate.FetchMode;
-import org.hibernate.annotations.Fetch;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
