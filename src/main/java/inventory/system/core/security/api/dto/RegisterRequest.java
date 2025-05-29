@@ -1,4 +1,4 @@
-package inventory.system.core.security.dto;
+package inventory.system.core.security.api.dto;
 
 
 import lombok.Data;
