@@ -35,36 +35,39 @@ public class JwtFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         final String token = extractTokenFromRequest(request);
+        log.debug("Processing request to '{}' with token: {}", request.getRequestURI(), 
+            token != null ? "present" : "not present");
 
-        if (StringUtils.hasText(token)) { // Check if token is not null and not empty
+        if (StringUtils.hasText(token)) {
             try {
                 String email = jwtUtil.extractEmail(token);
+                log.debug("Extracted email from token: {}", email);
 
-                // Only authenticate if email is present and there's no existing authentication in context
                 if (StringUtils.hasText(email) && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = this.userDetailsService.loadUserByUsername(email);
+                    log.debug("Loaded user details for {}, authorities: {}", email, 
+                        userDetails.getAuthorities());
 
                     if (jwtUtil.isTokenValid(token, userDetails.getUsername())) {
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 userDetails,
-                                null, // Credentials
+                                null,
                                 userDetails.getAuthorities());
                         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(authToken);
-                        log.debug("User '{}' authenticated successfully.", email);
+                        log.debug("Successfully authenticated user '{}' with authorities: {}", 
+                            email, userDetails.getAuthorities());
                     } else {
-                        log.warn("Invalid JWT token for user '{}'.", email);
+                        log.warn("Token validation failed for user '{}'", email);
+                        SecurityContextHolder.clearContext();
                     }
                 }
             } catch (Exception e) {
-                // Log an exception if token parsing or validation fails
-                log.error("Cannot set user authentication: {}", e.getMessage(), e);
-                // Optionally, you could set an error attribute on the request or directly write to response
-                // For example, response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); return;
-                // However, generally, let Spring Security's ExceptionTranslationFilter handle it later if unauthenticated
+                log.error("Authentication failed: {}", e.getMessage(), e);
+                SecurityContextHolder.clearContext();
             }
         } else {
-            log.trace("JWT Token does not begin with Bearer String or is not present.");
+            log.debug("No JWT token found in request");
         }
 
         filterChain.doFilter(request, response);

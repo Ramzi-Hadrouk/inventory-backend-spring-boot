@@ -1,6 +1,7 @@
 package inventory.system.core.security;
 
 import java.util.Collection;
+import lombok.extern.slf4j.Slf4j;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
 @Component
+@Slf4j
 public class JwtUtil {
 
     private final Key key;
@@ -44,6 +46,7 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put(SecurityConstants.JWT_ROLES_CLAIM, authorities.stream()
                 .map(GrantedAuthority::getAuthority)
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
                 .collect(Collectors.toList()));
 
         return Jwts.builder()
@@ -83,7 +86,19 @@ public class JwtUtil {
      * @return True if the token is expired, false otherwise.
      */
     private boolean isTokenExpired(String token) {
-        return parseToken(token).getExpiration().before(new Date());
+        try {
+            Claims claims = parseToken(token);
+            Date expiration = claims.getExpiration();
+            boolean isExpired = expiration != null && expiration.before(new Date());
+            if (log.isDebugEnabled()) {
+                log.debug("Token expiration time: {}, current time: {}, isExpired: {}", 
+                    expiration, new Date(), isExpired);
+            }
+            return isExpired;
+        } catch (Exception e) {
+            log.error("Error checking token expiration: {}", e.getMessage(), e);
+            return true; // Consider invalid tokens as expired
+        }
     }
 
     /**
@@ -93,10 +108,29 @@ public class JwtUtil {
      * @return The claims contained in the token.
      */
     private Claims parseToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            if (log.isDebugEnabled()) {
+                log.debug("Successfully parsed token. Subject: {}, Claims: {}", 
+                    claims.getSubject(), claims);
+            }
+            return claims;
+        } catch (Exception e) {
+            log.error("Error parsing JWT token: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Public method to extract all claims from a JWT token.
+     * @param token The JWT token.
+     * @return Claims object.
+     */
+    public Claims getAllClaims(String token) {
+        return parseToken(token);
     }
 }
