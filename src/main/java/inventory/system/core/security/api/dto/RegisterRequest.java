@@ -1,11 +1,8 @@
 package inventory.system.core.security.api.dto;
 
 
-import lombok.Data;
-
-@Data
-public class RegisterRequest {
-    private String email;
-    private String password;
-    private String fullname;
-}
+public record RegisterRequest(
+    String email,
+    String password,
+    String fullname
+) {}

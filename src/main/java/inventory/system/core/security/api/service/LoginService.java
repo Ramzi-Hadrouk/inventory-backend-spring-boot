@@ -33,13 +33,13 @@ public class LoginService {
     public ResponseEntity<?> execute(LoginRequest request) {
         try {
             authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
             );
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-            String token = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
+            UserDetails userDetails = userDetailsService.loadUserByUsername(request.email());
+            String jwt = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
 
-            AppUser appUser = appUserRepo.findByEmail(request.getEmail())
+            AppUser appUser = appUserRepo.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
             List<String> roles = appUser.getRoles().stream()
@@ -50,7 +50,7 @@ public class LoginService {
                 appUser.getEmail(),
                 appUser.getFullName(),
                 roles,
-                token
+                jwt
             ));
         } catch (AuthenticationException e) {
             return ResponseEntity.status(401)

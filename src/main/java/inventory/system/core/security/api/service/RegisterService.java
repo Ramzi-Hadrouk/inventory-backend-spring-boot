@@ -30,23 +30,23 @@ public class RegisterService {
 
     public ResponseEntity<?> execute(RegisterRequest request) {
         try {
-            if (appUserRepo.findByEmail(request.getEmail()).isPresent()) {
+            if (appUserRepo.findByEmail(request.email()).isPresent()) {
                 return ResponseEntity.badRequest()
                     .body(new ErrorResponse(SecurityConstants.EMAIL_ALREADY_EXISTS_MSG));
             }
 
             AppUser appUser = new AppUser(
                 null,
-                request.getFullname(),
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
+                request.fullname(),
+                request.email(),
+                passwordEncoder.encode(request.password()),
                 List.of(Role.USER),
                 null
             );
             appUserRepo.save(appUser);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-            String token = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
+            UserDetails userDetails = userDetailsService.loadUserByUsername(request.email());
+            String jwt = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
 
             List<String> roles = appUser.getRoles().stream()
                 .map(Role::name)
@@ -56,7 +56,7 @@ public class RegisterService {
                 appUser.getEmail(),
                 appUser.getFullName(),
                 roles,
-                token
+                jwt
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500)
