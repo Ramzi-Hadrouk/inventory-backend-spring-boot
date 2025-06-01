@@ -9,6 +9,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import inventory.system.core.security.JwtUtil;
@@ -24,35 +26,45 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class LoginService {
-
-    private final AuthenticationManager authManager;
+    
     private final UserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AppUserRepository appUserRepo;
 
     public ResponseEntity<?> execute(LoginRequest request) {
         try {
-            authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
-            );
-
+            // Load user details
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.email());
+            
+            // Verify password manually
+            if (!passwordEncoder.matches(request.password(), userDetails.getPassword())) {
+                return ResponseEntity.status(401)
+                    .body(new ErrorResponse(SecurityConstants.INVALID_CREDENTIALS_MSG));
+            }
+            
+            // Generate JWT token
             String jwt = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
-
+            
+            // Get user info for response
             AppUser appUser = appUserRepo.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
+            
             List<String> roles = appUser.getRoles().stream()
                 .map(Role::name)
                 .collect(Collectors.toList());
-
+            
             return ResponseEntity.ok(new SuccessAuthResponse(
                 appUser.getEmail(),
                 appUser.getFullName(),
                 roles,
                 jwt
             ));
-        } catch (AuthenticationException e) {
+            
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(401)
+                .body(new ErrorResponse(SecurityConstants.INVALID_CREDENTIALS_MSG));
+        } catch (Exception e) {
             return ResponseEntity.status(401)
                 .body(new ErrorResponse(SecurityConstants.INVALID_CREDENTIALS_MSG));
         }
