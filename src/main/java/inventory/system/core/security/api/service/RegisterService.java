@@ -46,6 +46,7 @@ public class RegisterService {
             appUserRepo.save(appUser);
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.email());
+            
             String jwt = jwtUtil.generateToken(userDetails.getUsername(), userDetails.getAuthorities());
 
             List<String> roles = appUser.getRoles().stream()
